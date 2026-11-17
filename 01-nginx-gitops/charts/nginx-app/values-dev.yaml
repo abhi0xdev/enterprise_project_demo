@@ -1,4 +1,3 @@
 replicaCount: 1
-
 image:
-  tag: "latest"
+  tag: "e458dc1c4d8657261cfdb62df4b6b59f6280136b"
