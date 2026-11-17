@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/abhi0xdev/enterprise_project_demo
+    targetRevision: main
+    path: 01-nginx-gitops/charts/nginx-app
+    helm:
+      releaseName: nginx
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nginx-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

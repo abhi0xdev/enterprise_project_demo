@@ -1,0 +1,53 @@
+name: 01-nginx-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "01-nginx-gitops/app/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/abhi0xdev/nginx-demo
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: 01-nginx-gitops/app/Dockerfile
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: 01-nginx-gitops/app
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Update image tag in Helm values
+        run: |
+          yq -i '.image.tag = "${{ github.sha }}"' 01-nginx-gitops/charts/nginx-app/values-dev.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add 01-nginx-gitops/charts/nginx-app/values-dev.yaml
+          git commit -m "ci: update dev image to ${{ github.sha }}"
+          git pull --rebase
+          git push

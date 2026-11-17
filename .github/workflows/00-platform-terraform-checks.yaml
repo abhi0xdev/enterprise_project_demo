@@ -1,0 +1,19 @@
+name: 00-platform-terraform-checks
+
+on:
+  pull_request:
+    paths:
+      - "00-platform/terraform/**"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 00-platform/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
