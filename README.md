@@ -84,7 +84,7 @@ Workflows trigger only on `app/**` changes. The pipeline's own commit to `values
 | Registry | GitHub Container Registry (GHCR) |
 | CD / GitOps | ArgoCD (automated sync, self-heal, prune) |
 | Web server | Nginx (alpine) |
-| Development | WSL2 (Ubuntu), Cursor IDE, GitHub CLI |
+| Development | WSL2 (Ubuntu), VS Code IDE, GitHub CLI |
 
 ---
 
@@ -164,7 +164,25 @@ terraform destroy
 4. Refresh the nginx page to see the new version.
 5. **Self-heal test:** run `kubectl scale deploy nginx -n nginx-dev --replicas=5`. ArgoCD reverts it to the value in Git.
 
-> Add screenshots of the pipeline run, the ArgoCD UI, and the running app in `shared/docs/` and link them here.
+---
+
+### Screenshots
+
+**GitHub Actions pipeline**
+
+![Pipeline run](shared/docs/pipeline-run.png)
+
+**ArgoCD showing the app Synced and Healthy**
+
+![ArgoCD synced](shared/docs/argocd-synced.png)
+
+**Running nginx app**
+
+![Nginx app](shared/docs/nginx-app.png)
+
+**Pods running in the cluster**
+
+![Pods running](shared/docs/pods-running.png)
 
 ---
 
