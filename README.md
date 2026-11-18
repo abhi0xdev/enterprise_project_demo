@@ -29,8 +29,6 @@ A hands-on DevOps portfolio that mimics a small enterprise delivery platform. In
 |---|---------|-------------|------|--------|
 | 00 | [Platform](00-platform/) | Local Kubernetes cluster and ArgoCD, created with Terraform | Terraform, kind, Helm, ArgoCD | Done |
 | 01 | [Nginx GitOps](01-nginx-gitops/) | Containerized nginx app delivered through CI/CD and GitOps | GitHub Actions, Docker, GHCR, Helm, ArgoCD | Done |
-| 02 | Observability | Prometheus and Grafana deployed through ArgoCD | Prometheus, Grafana | Planned |
-| 03 | Security and policy | Image scanning, admission policies | Trivy, Kyverno | Planned |
 
 ---
 
