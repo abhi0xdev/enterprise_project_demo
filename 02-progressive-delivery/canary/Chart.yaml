@@ -1,0 +1,6 @@
+apiVersion: v2
+name: rollouts-demo
+description: Demo nginx app deployment on kubernetes cluster through progressive delivery using Argo Rollouts
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
