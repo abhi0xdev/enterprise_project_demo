@@ -5,49 +5,188 @@ on:
     branches: [main]
     paths:
       - "01-nginx-gitops/app/**"
+      - "security/**"
+  pull_request:
+    paths:
+      - "01-nginx-gitops/app/**"
+      - "security/**"
   workflow_dispatch:
 
+concurrency:
+  group: "01-nginx-ci-${{ github.ref }}"
+  cancel-in-progress: true
+
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   IMAGE: ghcr.io/abhi0xdev/nginx-demo
+  CHART: 01-nginx-gitops/charts/nginx-app
+  APP_DIR: 01-nginx-gitops/app
 
 jobs:
-  build-and-update:
+  static-checks:
+    name: Lint and manifest scans
     runs-on: ubuntu-latest
+    env:
+      SNYK_Token: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: 01-nginx-gitops/app/Dockerfile
+          dockerfile: ${{ env.APP_DIR }}/Dockerfile
 
+      - name: Helm lint and render every environment
+        run: |
+          mkdir -p rendered
+          for e in dev staging prod; do
+            helm lint $CHART -f $CHART/values-$e.yaml
+            helm template nginx-$e $CHART -f $CHART/values-$e.yaml --namespace nginx-$e > rendered/$e.yaml
+          done
+
+      - name: Validate manifests
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          ./kubeconform -strict -summary rendered/
+
+      - name: Trivy config scan - Dockerfile
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: ${{ env.APP_DIR }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Trivy config scan - rendered Kubernetes manifests
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: rendered
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Snyk IaC scan (SaaS, optional)
+        if: env.SNYK_TOKEN != ''
+        continue-on-error: true
+        uses: snyk/actions/iac@master
+        with:
+          file: rendered/
+
+  build-scan-dast:
+    name: Build, scan, DAST, publish
+    needs: static-checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      STACKHAWK_API_KEY: ${{ secrets.STACKHAWK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - name: Build image (local only, not pushed yet)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.APP_DIR }}
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          build-args: |
+            APP_VERSION=${{ github.run_number }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the container does not run as root
+        run: |
+          uid=$(docker run --rm --entrypoint id ${{ env.IMAGE }}:${{ github.sha }} -u)
+          echo "Container user id: $uid"
+          test "$uid" != "0"
+
+      - name: Trivy container scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Snyk container scan (SaaS, optional)
+        if: env.SNYK_TOKEN != ''
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        with:
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+          args: --severity-threshold=high --file=${{ env.APP_DIR }}/Dockerfile
+
+      - name: Start the app for DAST
+        run: |
+          docker run -d --name app -p 8080:8080 ${{ env.IMAGE }}:${{ github.sha }}
+          for i in $(seq 1 20); do
+            curl -fs http://localhost:8080/healthz && break || sleep 2
+          done
+
+      - name: DAST with StackHawk (SaaS)
+        if: env.STACKHAWK_API_KEY != ''
+        uses: stackhawk/hawkscan-action@v2
+        with:
+          apiKey: ${{ secrets.STACKHAWK_API_KEY }}
+          configurationFiles: security/stackhawk.yml
+
+      - name: DAST with OWASP ZAP (fallback when no StackHawk key)
+        if: env.STACKHAWK_API_KEY == ''
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: http://localhost:8080
+          allow_issue_writing: false
+          fail_action: false
+
+      - name: Stop the app
+        if: always()
+        run: docker rm -f app || true
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Publish the scanned image
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
-          context: 01-nginx-gitops/app
+          context: ${{ env.APP_DIR }}
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
+          build-args: |
+            APP_VERSION=${{ github.run_number }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
 
-      - name: Update image tag in Helm values
+  deploy-dev:
+    name: Deploy to dev (GitOps commit)
+    needs: build-scan-dast
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update dev image tag
         run: |
-          yq -i '.image.tag = "${{ github.sha }}"' 01-nginx-gitops/charts/nginx-app/values-dev.yaml
+          yq -i '.image.tag = "${{ github.sha }}"' $CHART/values-dev.yaml
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add 01-nginx-gitops/charts/nginx-app/values-dev.yaml
-          git commit -m "ci: update dev image to ${{ github.sha }}"
+          git add $CHART/values-dev.yaml
+          git commit -m "ci(dev): deploy ${{ github.sha }}"
           git pull --rebase
           git push

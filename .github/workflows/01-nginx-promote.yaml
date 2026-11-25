@@ -1,0 +1,85 @@
+name: 01-nginx-promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (full commit SHA) to promote"
+        required: true
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/abhi0xdev/nginx-demo
+  CHART: 01-nginx-gitops/charts/nginx-app
+  TAG: ${{ inputs.tag }}
+
+jobs:
+  verify-image:
+    name: Verify the image exists
+    runs-on: ubuntu-latest
+    permissions:
+        contents: read
+        packages: read
+    steps:
+        - name: Validate tag format
+          run: echo "$TAG" | grep -Eq '^[0-9a-f]{40}$'
+
+        - uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Check the image in GHCR
+          run: docker buildx imagetools inspect "$IMAGE:$TAG"
+
+  staging:
+    name: Promote to staging
+    needs: verify-image
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+        contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Update staging tag
+        run: |
+          yq -i '.image.tag = strenv(TAG)' $CHART/values-staging.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add $CHART/values-staging.yaml
+          git commit -m "ci(staging): promote $TAG"
+          git pull --rebase
+          git push
+
+  production:
+    name: Promote to production (needs approval)
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+        contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Update prod tag
+        run: |
+          yq -i '.image.tag = strenv(TAG)' $CHART/values-prod.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add $CHART/values-prod.yaml
+          git commit -m "ci(prod): promote $TAG"
+          git pull --rebase
+          git push
+      - name: Reminder
+        run: echo "Prod is committed. Sync nginx-prod in ArgoCD to release it." >> "$GITHUB_STEP_SUMMARY"
+  

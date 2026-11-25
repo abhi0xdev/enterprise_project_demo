@@ -1,0 +1,4 @@
+app:
+  applicationId: REPLACE_WITH_YOUR_STACKHAWK_APP_ID
+  env: CI
+  host: http://localhost:8080

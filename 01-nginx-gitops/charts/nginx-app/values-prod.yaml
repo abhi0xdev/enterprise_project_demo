@@ -1,0 +1,7 @@
+replicaCount: 3
+environment: prod
+image:
+  tag: "latest"
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2

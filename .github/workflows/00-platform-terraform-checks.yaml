@@ -3,17 +3,31 @@ name: 00-platform-terraform-checks
 on:
   pull_request:
     paths:
-      - "00-platform/terraform/**"
+      - "00-platform/**"
+
+permissions:
+  contents: read
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: 00-platform/terraform
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -recursive
-      - run: terraform init -backend=false
-      - run: terraform validate
+
+      - name: Format check
+        run: terraform fmt -check -recursive 00-platform
+
+      - name: Init and validate
+        working-directory: 00-platform/environments/local
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Trivy IaC scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: 00-platform
+          severity: CRITICAL,HIGH
+          exit-code: "1"

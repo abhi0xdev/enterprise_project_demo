@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: "/01-nginx-gitops/app"
+    schedule:
+      interval: weekly
+  - package-ecosystem: terraform
+    directory: "/00-platform/environments/local"
+    schedule:
+      interval: weekly

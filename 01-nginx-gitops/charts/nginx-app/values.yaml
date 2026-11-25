@@ -1,13 +1,32 @@
 replicaCount: 2
+environment: dev
 
 image:
   repository: ghcr.io/abhi0xdev/nginx-demo
   tag: "latest"
   pullPolicy: IfNotPresent
 
+containerPort: 8080
+
 service:
   type: ClusterIP
   port: 80
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL
 
 resources:
   requests:
@@ -16,3 +35,7 @@ resources:
   limits:
     cpu: 200m
     memory: 128Mi
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
