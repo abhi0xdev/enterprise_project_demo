@@ -1,5 +1,5 @@
 # ---- Stage 1: build ----
-FROM alpine:3.20 AS builder
+FROM alpine:3.24 AS builder
 ARG APP_VERSION=dev
 ARG GIT_SHA=local
 WORKDIR /build
