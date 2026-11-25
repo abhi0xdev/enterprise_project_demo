@@ -25,10 +25,9 @@ A hands-on DevOps portfolio that mimics a small enterprise delivery platform. In
 
 ## Projects
 
-| # | Project | Description | Tech | Status |
-|---|---------|-------------|------|--------|
-| 00 | [Platform](00-platform/) | Local Kubernetes cluster and ArgoCD, created with Terraform | Terraform, kind, Helm, ArgoCD | Done |
-| 01 | [Nginx GitOps](01-nginx-gitops/) | Containerized nginx app delivered through CI/CD and GitOps | GitHub Actions, Docker, GHCR, Helm, ArgoCD | Done |
+| 00 | Platform | Terraform modules (kind-cluster, helm-addons, namespaces), dynamic config | Done |
+| 01 | Nginx GitOps | Multi-stage non-root image, Trivy/Snyk/StackHawk, 3 environments, approvals | Done |
+| 02 | Progressive delivery | Argo Rollouts canary and blue-green | In progress |
 
 ---
 
