@@ -30,7 +30,7 @@ jobs:
         - name: Validate tag format
           run: echo "$TAG" | grep -Eq '^[0-9a-f]{40}$'
 
-        - uses: docker/login-action@v3
+        - uses: docker/login-action@v4
           with:
             registry: ghcr.io
             username: ${{ github.actor }}
