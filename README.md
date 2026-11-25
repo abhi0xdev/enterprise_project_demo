@@ -25,8 +25,8 @@ A hands-on DevOps portfolio that mimics a small enterprise delivery platform. In
 
 ## Projects
 
-| # | Project | Description | Tech | Status |
-|---|---------|-------------|------|--------|
+| # | Project | Description | Status |
+|---|---------|-------------|--------|
 | 00 | [Platform](00-platform/) | Terraform modules (kind-cluster, helm-addons, namespaces), dynamic config | Done |
 | 01 | [Nginx GitOps](01-nginx-gitops/) | Multi-stage non-root image, Trivy/Snyk/StackHawk, 3 environments, approvals | Done |
 ---
